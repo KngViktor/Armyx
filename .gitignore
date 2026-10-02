@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.next/
+out/
+coverage/
+*.log
+.env
+.env.*
+!.env.example
+.turbo/
+*.tsbuildinfo
+loadtest/results/*.json
+!loadtest/results/.gitkeep
+.DS_Store
+apps/cms/src/app/(payload)/admin/importMap.js

@@ -1,0 +1,9 @@
+{
+  "identities": [
+    {
+      "name": "armyx",
+      "credentials": [{ "accessKey": "armyx", "secretKey": "armyx-secret" }],
+      "actions": ["Admin", "Read", "Write", "List", "Tagging"]
+    }
+  ]
+}
