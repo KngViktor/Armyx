@@ -33,6 +33,10 @@ class SessionModule {}
           remove: true,
         },
         autoLogging: { ignore: (req) => (req.url ?? '').includes('/health/') },
+        // At 3,000 rps, one log line per successful request is ~260M lines/day of noise.
+        // Successes are fully covered by Prometheus metrics, so they log at debug;
+        // client errors at warn, server errors at error.
+        customLogLevel: (_req, res, err) => (err || res.statusCode >= 500 ? 'error' : res.statusCode >= 400 ? 'warn' : 'debug'),
         transport: config().NODE_ENV === 'development' ? { target: 'pino/file', options: { destination: 1 } } : undefined,
       },
     }),

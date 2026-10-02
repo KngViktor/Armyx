@@ -1,0 +1,18 @@
+
+=== Recruitment spike: target 1000 rps against 2 API instance(s) ===
+requests            250882  (697/s avg over the whole run)
+failed (unexpected) 1.79%
+latency all         p50 84.4ms  p95 1225.6ms  max 26986.1ms
+peak arrival rate   1000 rps (portal_mix) + submission wave of 600
+submissions         600 accepted, submit p95 501.8ms
+rate limited (429)  0   load shed (503) 4275
+checks passed       98.24%
+  exercise       p50    25.3ms  p95   215.1ms  max 14056.7ms
+  draft_save     p50   141.9ms  p95  1314.0ms  max 15574.4ms
+  status         p50   125.6ms  p95  1040.5ms  max 15118.8ms
+  login          p50   304.2ms  p95  1984.0ms  max 15140.6ms
+  draft_get      p50   189.7ms  p95  1554.2ms  max 15353.7ms
+  lgas           p50    25.0ms  p95   204.9ms  max 13992.9ms
+  register       p50   295.8ms  p95  1841.4ms  max 15223.0ms
+  submit         p50   152.0ms  p95   501.8ms  max   805.6ms
+time="2026-10-02T19:56:32Z" level=error msg="thresholds on metrics 'checks, http_req_duration{name:draft_get}, http_req_duration{name:draft_save}, http_req_duration{name:login}, http_req_duration{name:register}, http_req_duration{name:status}, http_req_duration{scenario:portal_mix}, http_req_failed' have been crossed"

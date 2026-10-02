@@ -23,9 +23,10 @@ spec:
     - type: prometheus
       metadata:
         serverAddress: http://prometheus-operated.monitoring:9090
-        # Target ~80 rps per pod (measured capacity ~250 rps/pod; see docs/LOAD-TESTING.md).
+        # Desired pods = total rps / 150. Measured ~400 rps per API vCPU for the portal
+        # mix (docs/LOAD-TESTING.md); 150 keeps ~60% headroom for argon2 login bursts.
         query: sum(rate(armyx_http_requests_total{namespace="armyx"}[1m]))
-        threshold: "80"
+        threshold: "150"
 ---
 apiVersion: keda.sh/v1alpha1
 kind: ScaledObject

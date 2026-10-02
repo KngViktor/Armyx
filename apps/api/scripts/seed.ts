@@ -138,6 +138,21 @@ async function main() {
         apps,
       );
     }
+    // Load-test accounts that have not submitted get a complete draft + document records
+    // so the k6 spike test can exercise the real submission path.
+    if (process.env.SEED_LOADTEST_DRAFTS !== 'false') {
+      const draftUsers: string[] = [];
+      for (let k = 0; k < users[0]!.length; k++) if ((start + k) % 10 >= 7) draftUsers.push(users[0]![k]);
+      if (draftUsers.length) {
+        await db.query(
+          `INSERT INTO documents (user_id, exercise_id, type, s3_key, content_type, size_bytes, status)
+           SELECT u, $2, t, 'loadtest/' || u || '/' || t || '.pdf', 'application/pdf', 1024, 'verified'
+             FROM unnest($1::uuid[]) u CROSS JOIN unnest(ARRAY['passport_photo','olevel_certificate','birth_certificate','state_of_origin_letter']) t
+           ON CONFLICT DO NOTHING`,
+          [draftUsers, ex.id],
+        );
+      }
+    }
     process.stdout.write(`\rSeeded ${Math.min(start + BATCH, N)}/${N} applicant accounts`);
   }
   console.log(`\n\nSeed complete.

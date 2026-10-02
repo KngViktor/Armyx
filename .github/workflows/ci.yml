@@ -15,10 +15,6 @@ jobs:
       redis:
         image: redis:7-alpine
         ports: ["6379:6379"]
-      s3:
-        image: chrislusf/seaweedfs:latest
-        ports: ["8333:8333"]
-        options: --entrypoint "/entrypoint.sh"
     env:
       NODE_ENV: development
       DATABASE_URL: postgres://postgres:postgres@localhost:5432/armyx
@@ -30,11 +26,16 @@ jobs:
       OTP_FIXED_CODE: "123456"
       SEED_APPLICANTS: "500"
       S3_SSE: ""
+      S3_ENDPOINT: http://localhost:8333
+      S3_ACCESS_KEY_ID: armyx
+      S3_SECRET_ACCESS_KEY: armyx-secret
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: pnpm }
+      - name: Start S3-compatible storage
+        run: docker run -d -p 8333:8333 -v $PWD/infra/docker/seaweedfs-s3.json:/etc/s3.json:ro chrislusf/seaweedfs:latest server -s3 -s3.config=/etc/s3.json -dir=/data
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @armyx/shared build
       - run: pnpm typecheck
@@ -47,14 +48,10 @@ jobs:
       - name: End-to-end smoke test (API + workers)
         run: |
           (cd apps/api && node dist/main.js > /tmp/api.log 2>&1 &)
-          (cd apps/workers && node dist/main.js > /tmp/workers.log 2>&1 &)
+          (cd apps/workers && WORKER_METRICS_PORT=9465 node dist/main.js > /tmp/workers.log 2>&1 &)
           sleep 5
-          cd apps/api && S3_ENDPOINT=http://localhost:8333 node scripts/create-bucket.mjs || true
+          sleep 10 && cd apps/api && node scripts/create-bucket.mjs
           npx tsx scripts/smoke.ts
-        env:
-          S3_ENDPOINT: http://localhost:8333
-          S3_ACCESS_KEY_ID: any
-          S3_SECRET_ACCESS_KEY: any
 
   docker:
     needs: build-test

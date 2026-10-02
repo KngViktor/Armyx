@@ -9,6 +9,4 @@ coverage/
 !.env.example
 .turbo/
 *.tsbuildinfo
-loadtest/results/*.json
-!loadtest/results/.gitkeep
 .DS_Store
