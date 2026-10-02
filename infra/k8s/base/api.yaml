@@ -1,0 +1,48 @@
+# Stateless API: any pod serves any request (sessions/state in Redis).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  labels: { app: api }
+spec:
+  replicas: 6
+  revisionHistoryLimit: 5
+  strategy: { type: RollingUpdate, rollingUpdate: { maxSurge: 25%, maxUnavailable: 0 } }
+  selector: { matchLabels: { app: api } }
+  template:
+    metadata:
+      labels: { app: api }
+      annotations: { prometheus.io/scrape: "true", prometheus.io/port: "9464" }
+    spec:
+      terminationGracePeriodSeconds: 40
+      topologySpreadConstraints:
+        - { maxSkew: 1, topologyKey: topology.kubernetes.io/zone, whenUnsatisfiable: ScheduleAnyway, labelSelector: { matchLabels: { app: api } } }
+      securityContext: { runAsNonRoot: true, runAsUser: 1000, fsGroup: 1000, seccompProfile: { type: RuntimeDefault } }
+      containers:
+        - name: api
+          image: ghcr.io/armyx/api:latest
+          ports: [{ name: http, containerPort: 4000 }, { name: metrics, containerPort: 9464 }]
+          envFrom: [{ configMapRef: { name: armyx-config } }, { secretRef: { name: armyx-secrets } }]
+          resources:
+            requests: { cpu: "1", memory: 512Mi }
+            limits: { memory: 1Gi }
+          readinessProbe: { httpGet: { path: /api/v1/health/ready, port: http }, periodSeconds: 5, failureThreshold: 3 }
+          livenessProbe: { httpGet: { path: /api/v1/health/live, port: http }, periodSeconds: 10, failureThreshold: 6 }
+          startupProbe: { httpGet: { path: /api/v1/health/live, port: http }, periodSeconds: 2, failureThreshold: 30 }
+          # Give the load balancer time to stop routing before shutdown.
+          lifecycle: { preStop: { exec: { command: ["sleep", "10"] } } }
+          securityContext: { allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: [ALL] } }
+          volumeMounts: [{ name: tmp, mountPath: /tmp }]
+      volumes: [{ name: tmp, emptyDir: {} }]
+---
+apiVersion: v1
+kind: Service
+metadata: { name: api, labels: { app: api } }
+spec:
+  selector: { app: api }
+  ports: [{ name: http, port: 4000, targetPort: http }, { name: metrics, port: 9464, targetPort: metrics }]
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: { name: api }
+spec: { minAvailable: 70%, selector: { matchLabels: { app: api } } }

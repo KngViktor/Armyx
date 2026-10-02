@@ -1,0 +1,9 @@
+# Local stand-in for Cloudflare + ingress path routing (same origin for cookies/CSRF).
+:8080 {
+  handle /api/v1/* {
+    reverse_proxy api:4000
+  }
+  handle {
+    reverse_proxy web:3000
+  }
+}

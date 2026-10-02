@@ -1,0 +1,25 @@
+# Payload CMS — editors only; exposed on a separate hostname restricted by
+# Cloudflare Access (Zero Trust) so it is never reachable by the public.
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: cms, labels: { app: cms } }
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: cms } }
+  template:
+    metadata: { labels: { app: cms } }
+    spec:
+      securityContext: { runAsNonRoot: true, runAsUser: 1000, seccompProfile: { type: RuntimeDefault } }
+      containers:
+        - name: cms
+          image: ghcr.io/armyx/cms:latest
+          ports: [{ name: http, containerPort: 3001 }]
+          envFrom: [{ configMapRef: { name: armyx-config } }, { secretRef: { name: armyx-secrets } }]
+          resources: { requests: { cpu: 250m, memory: 512Mi }, limits: { memory: 1Gi } }
+          readinessProbe: { httpGet: { path: /api/site-settings/access, port: http }, periodSeconds: 15 }
+          securityContext: { allowPrivilegeEscalation: false, capabilities: { drop: [ALL] } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: cms }
+spec: { selector: { app: cms }, ports: [{ name: http, port: 3001, targetPort: http }] }

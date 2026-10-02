@@ -1,0 +1,69 @@
+# PgBouncer in transaction mode in front of the primary (armyx) and the
+# replicas (armyx_ro -> CNPG "-ro" service load-balances across replicas).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pgbouncer-config
+data:
+  pgbouncer.ini: |
+    [databases]
+    armyx    = host=armyx-pg-rw port=5432 dbname=armyx
+    armyx_ro = host=armyx-pg-ro port=5432 dbname=armyx
+    [pgbouncer]
+    listen_addr = 0.0.0.0
+    listen_port = 6432
+    auth_type = scram-sha-256
+    auth_file = /etc/pgbouncer-auth/userlist.txt
+    pool_mode = transaction
+    max_client_conn = 10000
+    default_pool_size = 60
+    reserve_pool_size = 20
+    reserve_pool_timeout = 2
+    server_idle_timeout = 60
+    query_wait_timeout = 30
+    ignore_startup_parameters = extra_float_digits,statement_timeout,application_name
+    stats_period = 15
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pgbouncer
+spec:
+  replicas: 3
+  selector: { matchLabels: { app: pgbouncer } }
+  template:
+    metadata: { labels: { app: pgbouncer } }
+    spec:
+      topologySpreadConstraints:
+        - { maxSkew: 1, topologyKey: topology.kubernetes.io/zone, whenUnsatisfiable: ScheduleAnyway, labelSelector: { matchLabels: { app: pgbouncer } } }
+      securityContext: { runAsNonRoot: true, runAsUser: 70, seccompProfile: { type: RuntimeDefault } }
+      containers:
+        - name: pgbouncer
+          image: edoburu/pgbouncer:v1.23.1-p3
+          ports: [{ containerPort: 6432 }]
+          resources: { requests: { cpu: 500m, memory: 128Mi }, limits: { memory: 256Mi } }
+          securityContext: { allowPrivilegeEscalation: false, readOnlyRootFilesystem: false, capabilities: { drop: [ALL] } }
+          readinessProbe: { tcpSocket: { port: 6432 }, periodSeconds: 5 }
+          volumeMounts:
+            - { name: config, mountPath: /etc/pgbouncer/pgbouncer.ini, subPath: pgbouncer.ini }
+            - { name: auth, mountPath: /etc/pgbouncer-auth }
+        - name: exporter
+          image: prometheuscommunity/pgbouncer-exporter:v0.10.2
+          args: ["--pgBouncer.connectionString=postgres://pgbouncer_stats@localhost:6432/pgbouncer?sslmode=disable"]
+          ports: [{ name: metrics, containerPort: 9127 }]
+          securityContext: { allowPrivilegeEscalation: false, capabilities: { drop: [ALL] } }
+      volumes:
+        - { name: config, configMap: { name: pgbouncer-config } }
+        - { name: auth, secret: { secretName: pgbouncer-userlist } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: pgbouncer }
+spec:
+  selector: { app: pgbouncer }
+  ports: [{ port: 6432, targetPort: 6432 }]
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: { name: pgbouncer }
+spec: { minAvailable: 2, selector: { matchLabels: { app: pgbouncer } } }

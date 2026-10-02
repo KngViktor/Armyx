@@ -1,0 +1,27 @@
+# Self-hosted edge waiting room (alternative to Cloudflare's managed Waiting
+# Room product, for plans that don't include it). Deploy: npx wrangler deploy
+name = "armyx-waiting-room"
+main = "src/index.ts"
+compatibility_date = "2026-09-01"
+
+routes = [
+  { pattern = "army.mil.ng/portal*", zone_name = "army.mil.ng" },
+  { pattern = "army.mil.ng/api/v1/auth/*", zone_name = "army.mil.ng" },
+  { pattern = "army.mil.ng/api/v1/applications/*", zone_name = "army.mil.ng" },
+]
+
+[vars]
+ADMIT_PER_MINUTE = "8000"     # sustained admission rate (size from load tests)
+SESSION_MINUTES = "15"        # admitted session lifetime, renewed on activity
+ENABLED = "true"              # kill switch
+SHARDS = "16"                 # gate shards; each Durable Object handles ADMIT_PER_MINUTE/SHARDS
+
+[[durable_objects.bindings]]
+name = "GATE"
+class_name = "Gate"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Gate"]
+
+# Secret (wrangler secret put COOKIE_SECRET): HMAC key for signed queue/admission cookies.

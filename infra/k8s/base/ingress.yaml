@@ -1,0 +1,31 @@
+# Origin ingress. Only Cloudflare may reach it: Authenticated Origin Pulls
+# (mTLS) + source-range allow-list of Cloudflare IPs. Same origin for the
+# website and /api/v1 so cookies are first-party and SameSite works.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: armyx
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: 1m
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "30"
+    nginx.ingress.kubernetes.io/auth-tls-secret: armyx/cloudflare-origin-pull-ca
+    nginx.ingress.kubernetes.io/auth-tls-verify-client: "on"
+    # Keep in sync with https://www.cloudflare.com/ips/ (automate in CI).
+    nginx.ingress.kubernetes.io/whitelist-source-range: >-
+      173.245.48.0/20,103.21.244.0/22,103.22.200.0/22,103.31.4.0/22,141.101.64.0/18,108.162.192.0/18,190.93.240.0/20,188.114.96.0/20,197.234.240.0/22,198.41.128.0/17,162.158.0.0/15,104.16.0.0/13,104.24.0.0/14,172.64.0.0/13,131.0.72.0/22
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts: [army.mil.ng, www.army.mil.ng, cms.army.mil.ng]
+      secretName: armyx-origin-cert
+  rules:
+    - host: army.mil.ng
+      http:
+        paths:
+          - { path: /api/v1, pathType: Prefix, backend: { service: { name: api, port: { number: 4000 } } } }
+          - { path: /, pathType: Prefix, backend: { service: { name: web, port: { number: 3000 } } } }
+    - host: cms.army.mil.ng
+      http:
+        paths:
+          - { path: /, pathType: Prefix, backend: { service: { name: cms, port: { number: 3001 } } } }

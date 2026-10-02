@@ -1,0 +1,58 @@
+# Non-secret configuration. Secrets (DB passwords, encryption keys, SMTP/SMS
+# credentials, Turnstile secret) live in `armyx-secrets`, synced from a secret
+# manager / KMS with External Secrets Operator — never committed. See
+# secrets.example.yaml for the expected keys.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: armyx-config
+data:
+  NODE_ENV: production
+  PORT: "4000"
+  METRICS_PORT: "9464"
+  WORKER_METRICS_PORT: "9465"
+  CORS_ORIGINS: https://army.mil.ng,https://www.army.mil.ng
+  PUBLIC_WEB_URL: https://army.mil.ng
+  COOKIE_SECURE: "true"
+  TRUST_PROXY_HOPS: "2"
+  MAX_INFLIGHT: "300"
+  DB_POOL_MAX: "15"
+  REDIS_CLUSTER_NODES: redis-cluster-0.redis-cluster-headless:6379,redis-cluster-1.redis-cluster-headless:6379,redis-cluster-2.redis-cluster-headless:6379
+  REDIS_TLS: "false"
+  S3_REGION: af-south-1
+  S3_BUCKET: armyx-recruitment-documents
+  S3_FORCE_PATH_STYLE: "false"
+  S3_SSE: aws:kms
+  SMS_PROVIDER: termii
+  LOG_LEVEL: info
+  CMS_URL: http://cms:3001
+  WEB_REVALIDATE_URL: http://web:3000/api/revalidate
+  CMS_PUBLIC_URL: https://cms.army.mil.ng
+  NEXT_PUBLIC_SITE_URL: https://army.mil.ng
+---
+# Example only — create the real Secret from your secret manager.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: armyx-secrets-example
+  annotations: { note: "Template of keys expected in armyx-secrets. Values here are placeholders." }
+type: Opaque
+stringData:
+  DATABASE_URL: postgres://armyx_app:CHANGE_ME@pgbouncer:6432/armyx
+  DATABASE_REPLICA_URL: postgres://armyx_app:CHANGE_ME@pgbouncer:6432/armyx_ro
+  MIGRATION_DATABASE_URL: postgres://armyx_owner:CHANGE_ME@armyx-pg-rw:5432/armyx
+  CMS_DATABASE_URL: postgres://armyx_cms:CHANGE_ME@armyx-pg-rw:5432/armyx_cms
+  REDIS_PASSWORD: CHANGE_ME
+  DATA_ENCRYPTION_KEYS: "1:BASE64_32_BYTES_FROM_KMS"
+  DATA_ENCRYPTION_KEY_VERSION: "1"
+  BLIND_INDEX_KEY: BASE64_32_BYTES
+  IP_HASH_SALT: CHANGE_ME
+  TURNSTILE_SECRET: CHANGE_ME
+  S3_ACCESS_KEY_ID: ""        # prefer IRSA / workload identity instead of static keys
+  S3_SECRET_ACCESS_KEY: ""
+  SMTP_URL: smtps://user:pass@smtp.provider:465
+  SMS_API_KEY: CHANGE_ME
+  PAYLOAD_SECRET: CHANGE_ME
+  REVALIDATE_SECRET: CHANGE_ME
+  CLOUDFLARE_ZONE_ID: CHANGE_ME
+  CLOUDFLARE_API_TOKEN: CHANGE_ME

@@ -1,0 +1,16 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources: [../../base]
+images:
+  - { name: ghcr.io/armyx/api, newTag: "REPLACE_WITH_GIT_SHA" }
+  - { name: ghcr.io/armyx/workers, newTag: "REPLACE_WITH_GIT_SHA" }
+  - { name: ghcr.io/armyx/web, newTag: "REPLACE_WITH_GIT_SHA" }
+  - { name: ghcr.io/armyx/cms, newTag: "REPLACE_WITH_GIT_SHA" }
+patches:
+  # Example secret wiring with External Secrets Operator (pulls from AWS Secrets Manager / Vault).
+  - target: { kind: Secret, name: armyx-secrets-example }
+    patch: |
+      $patch: delete
+      apiVersion: v1
+      kind: Secret
+      metadata: { name: armyx-secrets-example }

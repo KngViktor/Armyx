@@ -1,0 +1,33 @@
+# Next.js server for the statically generated site. Cloudflare caches the HTML
+# (Cache Everything for public paths), so these pods mostly serve CDN misses,
+# revalidation and image optimisation.
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: web, labels: { app: web } }
+spec:
+  replicas: 3
+  selector: { matchLabels: { app: web } }
+  template:
+    metadata: { labels: { app: web } }
+    spec:
+      securityContext: { runAsNonRoot: true, runAsUser: 1000, seccompProfile: { type: RuntimeDefault } }
+      containers:
+        - name: web
+          image: ghcr.io/armyx/web:latest
+          ports: [{ name: http, containerPort: 3000 }]
+          env:
+            - { name: CMS_URL, valueFrom: { configMapKeyRef: { name: armyx-config, key: CMS_URL } } }
+            - { name: REVALIDATE_SECRET, valueFrom: { secretKeyRef: { name: armyx-secrets, key: REVALIDATE_SECRET } } }
+          resources: { requests: { cpu: 500m, memory: 512Mi }, limits: { memory: 1Gi } }
+          readinessProbe: { httpGet: { path: /, port: http }, periodSeconds: 10 }
+          securityContext: { allowPrivilegeEscalation: false, capabilities: { drop: [ALL] } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: web }
+spec: { selector: { app: web }, ports: [{ name: http, port: 3000, targetPort: http }] }
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: { name: web }
+spec: { minAvailable: 2, selector: { matchLabels: { app: web } } }

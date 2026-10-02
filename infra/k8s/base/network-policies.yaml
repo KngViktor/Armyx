@@ -1,0 +1,50 @@
+# Default deny; then allow only the flows the system needs.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: default-deny }
+spec: { podSelector: {}, policyTypes: [Ingress] }
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: allow-ingress-controller }
+spec:
+  podSelector: { matchExpressions: [{ key: app, operator: In, values: [api, web, cms] }] }
+  ingress:
+    - from: [{ namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: ingress-nginx } } }]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: allow-pgbouncer }
+spec:
+  podSelector: { matchLabels: { app: pgbouncer } }
+  ingress:
+    - from: [{ podSelector: { matchExpressions: [{ key: app, operator: In, values: [api, workers] }] } }]
+      ports: [{ port: 6432 }]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: allow-postgres }
+spec:
+  podSelector: { matchLabels: { cnpg.io/cluster: armyx-pg } }
+  ingress:
+    - from:
+        - podSelector: { matchExpressions: [{ key: app, operator: In, values: [pgbouncer, cms] }] }
+        - podSelector: { matchLabels: { job-name: db-migrate } }
+        - podSelector: { matchLabels: { cnpg.io/cluster: armyx-pg } }
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: allow-internal-web-cms }
+spec:
+  podSelector: { matchExpressions: [{ key: app, operator: In, values: [web, cms] }] }
+  ingress:
+    - from: [{ podSelector: { matchExpressions: [{ key: app, operator: In, values: [web, cms] }] } }]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: allow-prometheus }
+spec:
+  podSelector: {}
+  ingress:
+    - from: [{ namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: monitoring } } }]
+      ports: [{ port: 9464 }, { port: 9465 }, { port: 9127 }, { port: 9187 }]

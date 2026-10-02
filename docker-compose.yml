@@ -1,0 +1,137 @@
+# =============================================================================
+# Full local stack: PostgreSQL primary + streaming replica, PgBouncer, Redis,
+# S3-compatible storage (SeaweedFS), Mailpit (email sink), CMS, API, workers, web.
+#
+#   cp .env.example .env    # then set keys (see README)
+#   docker compose up -d --build
+#   docker compose run --rm migrate && docker compose run --rm seed
+#
+#   Website      http://localhost:8080      Admin  http://localhost:8080/admin
+#   (8080 = Caddy edge doing same-origin routing like Cloudflare/ingress in production)
+#   CMS          http://localhost:3001/admin
+#   Mailpit      http://localhost:8025
+# =============================================================================
+x-app-env: &app-env
+  env_file: .env
+  environment:
+    NODE_ENV: production
+    COOKIE_SECURE: "false"
+    DATABASE_URL: postgres://armyx:armyx@pgbouncer:6432/armyx
+    DATABASE_REPLICA_URL: postgres://armyx:armyx@pgbouncer:6432/armyx_ro
+    MIGRATION_DATABASE_URL: postgres://armyx:armyx@postgres:5432/armyx
+    REDIS_URL: redis://redis:6379
+    S3_ENDPOINT: http://s3:8333
+    S3_PUBLIC_ENDPOINT: http://localhost:8333
+    S3_SSE: ""
+    SMTP_URL: smtp://mailpit:1025
+    CORS_ORIGINS: http://localhost:8080
+    PUBLIC_WEB_URL: http://localhost:8080
+    CMS_DATABASE_URL: postgres://armyx:armyx@postgres:5432/armyx_cms
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: armyx
+      POSTGRES_PASSWORD: armyx
+      POSTGRES_DB: armyx
+    command: ["postgres", "-c", "wal_level=replica", "-c", "max_wal_senders=10", "-c", "max_connections=300", "-c", "shared_buffers=512MB"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./infra/docker/postgres-primary-init.sh:/docker-entrypoint-initdb.d/10-init.sh:ro
+    healthcheck: { test: ["CMD", "pg_isready", "-U", "armyx"], interval: 5s, retries: 20 }
+
+  postgres-replica:
+    image: postgres:16-alpine
+    user: postgres
+    environment: { PGPASSWORD: replicator }
+    depends_on: { postgres: { condition: service_healthy } }
+    entrypoint: ["/bin/sh", "/replica.sh"]
+    volumes:
+      - pgreplica:/var/lib/postgresql/data
+      - ./infra/docker/postgres-replica.sh:/replica.sh:ro
+    healthcheck: { test: ["CMD", "pg_isready"], interval: 5s, retries: 30 }
+
+  pgbouncer:
+    image: edoburu/pgbouncer:latest
+    depends_on: { postgres: { condition: service_healthy }, postgres-replica: { condition: service_healthy } }
+    volumes:
+      - ./infra/docker/pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro
+      - ./infra/docker/userlist.txt:/etc/pgbouncer/userlist.txt:ro
+    ports: ["6432:6432"]
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    volumes: [redisdata:/data]
+    healthcheck: { test: ["CMD", "redis-cli", "ping"], interval: 5s }
+
+  s3:
+    image: chrislusf/seaweedfs:latest
+    command: ["server", "-s3", "-s3.config=/etc/s3.json", "-dir=/data"]
+    volumes:
+      - s3data:/data
+      - ./infra/docker/seaweedfs-s3.json:/etc/s3.json:ro
+    ports: ["8333:8333"]
+
+  mailpit:
+    image: axllent/mailpit:latest
+    ports: ["8025:8025"]
+
+  migrate:
+    <<: *app-env
+    build: { context: ., dockerfile: apps/api/Dockerfile }
+    command: ["sh", "-c", "tsx scripts/migrate.ts && node scripts/create-bucket.mjs"]
+    depends_on: { postgres: { condition: service_healthy } }
+    profiles: ["tools"]
+
+  seed:
+    <<: *app-env
+    build: { context: ., dockerfile: apps/api/Dockerfile }
+    command: ["tsx", "scripts/seed.ts"]
+    profiles: ["tools"]
+
+  api:
+    <<: *app-env
+    build: { context: ., dockerfile: apps/api/Dockerfile }
+    depends_on: { pgbouncer: { condition: service_started }, redis: { condition: service_healthy } }
+    ports: ["4000:4000"]
+    deploy: { replicas: 1 }
+
+  workers:
+    <<: *app-env
+    build: { context: ., dockerfile: apps/workers/Dockerfile }
+    depends_on: { pgbouncer: { condition: service_started }, redis: { condition: service_healthy } }
+
+  cms:
+    <<: *app-env
+    build: { context: ., dockerfile: apps/cms/Dockerfile }
+    environment:
+      NODE_ENV: production
+      CMS_DATABASE_URL: postgres://armyx:armyx@postgres:5432/armyx_cms
+      WEB_REVALIDATE_URL: http://web:3000/api/revalidate
+      NEXT_PUBLIC_SITE_URL: http://localhost:8080
+      CMS_PUBLIC_URL: http://localhost:3001
+    depends_on: { postgres: { condition: service_healthy } }
+    ports: ["3001:3001"]
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_SITE_URL: http://localhost:8080
+        NEXT_PUBLIC_UPLOAD_ORIGIN: http://localhost:8333
+    env_file: .env
+    environment:
+      CMS_URL: http://cms:3001
+    ports: ["3000:3000"]
+
+  # Same-origin routing like production: /api/v1/* -> api, everything else -> web.
+  edge:
+    image: caddy:2-alpine
+    volumes: [./infra/docker/Caddyfile:/etc/caddy/Caddyfile:ro]
+    ports: ["8080:8080"]
+    depends_on: [api, web]
+
+volumes: { pgdata: {}, pgreplica: {}, redisdata: {}, s3data: {} }

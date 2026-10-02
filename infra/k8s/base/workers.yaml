@@ -1,0 +1,80 @@
+# One image, several deployments: each queue group scales independently on
+# its own backlog (see autoscaling.yaml).
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: workers-submissions, labels: { app: workers, group: submissions } }
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: workers, group: submissions } }
+  template:
+    metadata:
+      labels: { app: workers, group: submissions }
+      annotations: { prometheus.io/scrape: "true", prometheus.io/port: "9465" }
+    spec:
+      terminationGracePeriodSeconds: 120   # let in-flight jobs finish
+      securityContext: { runAsNonRoot: true, runAsUser: 1000, seccompProfile: { type: RuntimeDefault } }
+      containers:
+        - name: workers
+          image: ghcr.io/armyx/workers:latest
+          env:
+            - { name: WORKER_QUEUES, value: "submissions,drafts" }
+            - { name: WORKER_CONCURRENCY, value: "20" }
+          envFrom: [{ configMapRef: { name: armyx-config } }, { secretRef: { name: armyx-secrets } }]
+          ports: [{ name: metrics, containerPort: 9465 }]
+          resources: { requests: { cpu: 500m, memory: 512Mi }, limits: { memory: 1Gi } }
+          livenessProbe: { httpGet: { path: /health, port: metrics }, periodSeconds: 15 }
+          securityContext: { allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: [ALL] } }
+          volumeMounts: [{ name: tmp, mountPath: /tmp }]
+      volumes: [{ name: tmp, emptyDir: {} }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: workers-notifications, labels: { app: workers, group: notifications } }
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: workers, group: notifications } }
+  template:
+    metadata:
+      labels: { app: workers, group: notifications }
+      annotations: { prometheus.io/scrape: "true", prometheus.io/port: "9465" }
+    spec:
+      terminationGracePeriodSeconds: 60
+      securityContext: { runAsNonRoot: true, runAsUser: 1000, seccompProfile: { type: RuntimeDefault } }
+      containers:
+        - name: workers
+          image: ghcr.io/armyx/workers:latest
+          env:
+            - { name: WORKER_QUEUES, value: "notifications,contact" }
+            - { name: WORKER_CONCURRENCY, value: "20" }
+          envFrom: [{ configMapRef: { name: armyx-config } }, { secretRef: { name: armyx-secrets } }]
+          ports: [{ name: metrics, containerPort: 9465 }]
+          resources: { requests: { cpu: 250m, memory: 256Mi }, limits: { memory: 512Mi } }
+          securityContext: { allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: [ALL] } }
+          volumeMounts: [{ name: tmp, mountPath: /tmp }]
+      volumes: [{ name: tmp, emptyDir: {} }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: workers-heavy, labels: { app: workers, group: heavy } }
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: workers, group: heavy } }
+  template:
+    metadata:
+      labels: { app: workers, group: heavy }
+      annotations: { prometheus.io/scrape: "true", prometheus.io/port: "9465" }
+    spec:
+      terminationGracePeriodSeconds: 300
+      securityContext: { runAsNonRoot: true, runAsUser: 1000, seccompProfile: { type: RuntimeDefault } }
+      containers:
+        - name: workers
+          image: ghcr.io/armyx/workers:latest
+          env:
+            - { name: WORKER_QUEUES, value: "pdf,exports,documents,maintenance" }
+            - { name: WORKER_CONCURRENCY, value: "8" }
+          envFrom: [{ configMapRef: { name: armyx-config } }, { secretRef: { name: armyx-secrets } }]
+          ports: [{ name: metrics, containerPort: 9465 }]
+          resources: { requests: { cpu: "1", memory: 1Gi }, limits: { memory: 2Gi } }
+          securityContext: { allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: [ALL] } }
+          volumeMounts: [{ name: tmp, mountPath: /tmp }]
+      volumes: [{ name: tmp, emptyDir: { sizeLimit: 5Gi } }]

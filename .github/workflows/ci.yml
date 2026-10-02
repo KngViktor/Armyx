@@ -1,0 +1,78 @@
+name: CI
+on:
+  push: { branches: [main] }
+  pull_request:
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env: { POSTGRES_USER: postgres, POSTGRES_PASSWORD: postgres, POSTGRES_DB: armyx }
+        ports: ["5432:5432"]
+        options: --health-cmd pg_isready --health-interval 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+      s3:
+        image: chrislusf/seaweedfs:latest
+        ports: ["8333:8333"]
+        options: --entrypoint "/entrypoint.sh"
+    env:
+      NODE_ENV: development
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/armyx
+      MIGRATION_DATABASE_URL: postgres://postgres:postgres@localhost:5432/armyx
+      REDIS_URL: redis://localhost:6379
+      DATA_ENCRYPTION_KEYS: "1:MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="
+      BLIND_INDEX_KEY: ZmVkY2JhOTg3NjU0MzIxMGZlZGNiYTk4NzY1NDMyMTA=
+      IP_HASH_SALT: ci-only-salt-not-secret
+      OTP_FIXED_CODE: "123456"
+      SEED_APPLICANTS: "500"
+      S3_SSE: ""
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @armyx/shared build
+      - run: pnpm typecheck
+      - run: pnpm --filter @armyx/shared test
+      - run: pnpm --filter @armyx/api build && pnpm --filter @armyx/workers build
+      - run: pnpm --filter @armyx/api test && pnpm --filter @armyx/workers test
+      - run: pnpm --filter @armyx/web build
+      - name: Migrate and seed
+        run: pnpm db:migrate && pnpm db:seed
+      - name: End-to-end smoke test (API + workers)
+        run: |
+          (cd apps/api && node dist/main.js > /tmp/api.log 2>&1 &)
+          (cd apps/workers && node dist/main.js > /tmp/workers.log 2>&1 &)
+          sleep 5
+          cd apps/api && S3_ENDPOINT=http://localhost:8333 node scripts/create-bucket.mjs || true
+          npx tsx scripts/smoke.ts
+        env:
+          S3_ENDPOINT: http://localhost:8333
+          S3_ACCESS_KEY_ID: any
+          S3_SECRET_ACCESS_KEY: any
+
+  docker:
+    needs: build-test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions: { contents: read, packages: write }
+    strategy:
+      matrix: { app: [api, workers, web, cms] }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with: { registry: ghcr.io, username: "${{ github.actor }}", password: "${{ secrets.GITHUB_TOKEN }}" }
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/${{ matrix.app }}/Dockerfile
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/armyx-${{ matrix.app }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

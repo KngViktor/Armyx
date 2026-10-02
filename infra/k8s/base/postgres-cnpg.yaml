@@ -1,0 +1,67 @@
+# PostgreSQL via CloudNativePG: 1 primary + 2 streaming replicas across zones,
+# continuous WAL archiving to object storage => point-in-time recovery, plus a
+# scheduled daily base backup. (A managed service such as RDS/Cloud SQL with
+# read replicas and PITR is an equally valid choice — see docs/DEPLOYMENT.md.)
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: armyx-pg
+spec:
+  instances: 3
+  imageName: ghcr.io/cloudnative-pg/postgresql:16
+  primaryUpdateStrategy: unsupervised
+  enableSuperuserAccess: false
+  postgresql:
+    parameters:
+      max_connections: "400"
+      shared_buffers: 4GB
+      effective_cache_size: 12GB
+      work_mem: 16MB
+      maintenance_work_mem: 512MB
+      wal_compression: "on"
+      random_page_cost: "1.1"
+      log_min_duration_statement: "500"
+      pg_stat_statements.track: all
+    shared_preload_libraries: [pg_stat_statements]
+  bootstrap:
+    initdb:
+      database: armyx
+      owner: armyx_owner
+      postInitApplicationSQL:
+        - CREATE DATABASE armyx_cms
+  storage:
+    size: 500Gi
+    storageClass: encrypted-ssd     # encryption at rest
+  walStorage:
+    size: 100Gi
+    storageClass: encrypted-ssd
+  resources:
+    requests: { cpu: "4", memory: 16Gi }
+    limits: { memory: 16Gi }
+  affinity:
+    topologyKey: topology.kubernetes.io/zone
+    enablePodAntiAffinity: true
+  monitoring:
+    enablePodMonitor: true
+  backup:
+    retentionPolicy: 35d
+    barmanObjectStore:
+      destinationPath: s3://armyx-db-backups/armyx-pg
+      s3Credentials:
+        inheritFromIAMRole: true
+      wal:
+        compression: gzip
+        encryption: aws:kms
+      data:
+        compression: gzip
+        encryption: aws:kms
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: armyx-pg-daily
+spec:
+  schedule: "0 0 1 * * *"     # 01:00 daily (seconds field first)
+  backupOwnerReference: self
+  cluster:
+    name: armyx-pg
