@@ -1,0 +1,107 @@
+@import 'tailwindcss';
+@import '@fontsource-variable/source-serif-4';
+@import '@fontsource-variable/inter';
+
+/*
+ * Design tokens — army green, deep olive, khaki, white with gold accents.
+ * Contrast notes (WCAG 2.1 AA): body text uses ink (#1c2416) on white/sand;
+ * gold is only used for accents, borders and on dark olive backgrounds where
+ * it reaches > 4.5:1. Never use gold text on white.
+ */
+@theme {
+  --color-olive-950: #141a0f;
+  --color-olive-900: #1f2817;
+  --color-olive-800: #2f3b22;
+  --color-olive-700: #3b4a2a;
+  --color-olive-600: #4b5d35;
+  --color-olive-500: #5f7444;
+  --color-olive-100: #e7ebdc;
+  --color-olive-50: #f3f5ec;
+  --color-khaki-500: #b39f74;
+  --color-khaki-300: #d8cba8;
+  --color-khaki-100: #efe8d6;
+  --color-sand: #f7f4ec;
+  --color-gold-600: #a07f22;
+  --color-gold-500: #c9a43a;
+  --color-gold-300: #e3cc7f;
+  --color-ink: #1c2416;
+  --color-muted: #4f5a45;
+  --color-danger: #a4271b;
+  --color-success: #2d6a32;
+
+  --font-serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+  --font-sans: 'Inter Variable', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+
+  --shadow-card: 0 1px 2px rgb(20 26 15 / 0.06), 0 8px 24px -12px rgb(20 26 15 / 0.18);
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-white font-sans text-ink antialiased;
+  }
+  h1, h2, h3, h4 {
+    @apply font-serif tracking-tight text-olive-900;
+  }
+  :focus-visible {
+    outline: 3px solid var(--color-gold-500);
+    outline-offset: 2px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@utility container-x {
+  @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
+}
+@utility eyebrow {
+  @apply inline-flex items-center gap-2 text-xs font-semibold tracking-[0.18em] uppercase text-olive-600;
+  &::before {
+    content: '';
+    @apply inline-block h-0.5 w-6 bg-gold-500;
+  }
+}
+@utility btn {
+  @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-md px-5 py-2.5 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60;
+}
+@utility btn-primary {
+  @apply btn bg-olive-700 text-white hover:bg-olive-800;
+}
+@utility btn-gold {
+  @apply btn bg-gold-500 text-olive-950 hover:bg-gold-300;
+}
+@utility btn-outline {
+  @apply btn border border-olive-700 bg-white text-olive-800 hover:bg-olive-50;
+}
+@utility btn-ghost-light {
+  @apply btn border border-white/50 text-white hover:bg-white/10;
+}
+@utility card {
+  @apply rounded-xl border border-olive-100 bg-white shadow-card;
+}
+@utility field-label {
+  @apply mb-1.5 block text-sm font-semibold text-olive-900;
+}
+@utility field-input {
+  @apply block min-h-11 w-full rounded-md border border-khaki-500 bg-white px-3 py-2 text-base text-ink placeholder:text-muted/70 focus:border-olive-600 focus:ring-2 focus:ring-olive-600/30 focus:outline-none aria-[invalid=true]:border-danger;
+}
+@utility badge {
+  @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold;
+}
+@utility prose-army {
+  & p {
+    @apply mb-4 leading-7 text-ink;
+  }
+}
+
+.skip-link {
+  @apply absolute left-2 top-2 z-[100] -translate-y-20 rounded bg-gold-500 px-4 py-2 font-semibold text-olive-950 focus:translate-y-0;
+}
