@@ -12,4 +12,3 @@ coverage/
 loadtest/results/*.json
 !loadtest/results/.gitkeep
 .DS_Store
-apps/cms/src/app/(payload)/admin/importMap.js
