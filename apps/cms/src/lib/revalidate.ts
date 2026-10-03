@@ -11,7 +11,10 @@ async function run() {
   const secret = process.env.REVALIDATE_SECRET;
   if (url && secret) {
     try {
-      const r = await fetch(url, { method: 'POST', headers: { 'x-revalidate-secret': secret }, signal: AbortSignal.timeout(15_000) });
+      const headers: Record<string, string> = { 'x-revalidate-secret': secret };
+      // Lets the call through Vercel Deployment Protection when the website is a protected preview.
+      if (process.env.WEB_PROTECTION_BYPASS) headers['x-vercel-protection-bypass'] = process.env.WEB_PROTECTION_BYPASS;
+      const r = await fetch(url, { method: 'POST', headers, signal: AbortSignal.timeout(15_000) });
       console.info(`[revalidate] web responded ${r.status}`);
     } catch (e) {
       console.error('[revalidate] web revalidation failed', (e as Error).message);

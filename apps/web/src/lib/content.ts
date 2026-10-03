@@ -19,6 +19,8 @@ export const getContent = cache(async (): Promise<SiteContent> => {
   if (!cms) return seedContent;
   try {
     const res = await fetch(`${cms}/api/site-content`, {
+      // Lets the build through Vercel Deployment Protection when the CMS is a protected preview.
+      headers: process.env.CMS_PROTECTION_BYPASS ? { 'x-vercel-protection-bypass': process.env.CMS_PROTECTION_BYPASS } : undefined,
       next: { tags: [CONTENT_TAG] },
       signal: AbortSignal.timeout(10_000),
     });

@@ -11,7 +11,9 @@
     "generate:importmap": "payload generate:importmap",
     "generate:types": "payload generate:types",
     "payload": "payload",
-    "seed": "payload run src/seed.ts"
+    "seed": "payload run src/seed.ts",
+    "migrate": "payload migrate",
+    "build:vercel": "payload migrate && payload run src/seed.ts && next build"
   },
   "dependencies": {
     "@armyx/shared": "workspace:*",
@@ -23,7 +25,8 @@
     "payload": "3.90.2",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "sharp": "^0.34.4"
+    "sharp": "^0.34.4",
+    "@payloadcms/storage-vercel-blob": "3.90.2"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
