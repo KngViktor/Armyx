@@ -10,6 +10,7 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { ChevronDown, Menu, Phone, X, ShieldCheck, ArrowRight } from 'lucide-react';
 import { NAV } from '@/lib/nav';
+import { DEMO } from '@/lib/api';
 
 export function Header() {
   const pathname = usePathname();
@@ -60,7 +61,7 @@ export function Header() {
         <div className="container-x flex h-9 items-center justify-between gap-4">
           <p className="flex items-center gap-1.5 truncate">
             <ShieldCheck aria-hidden className="h-3.5 w-3.5 text-gold-500" />
-            <span className="truncate">Official website of the Nigerian Army</span>
+            <span className="truncate">{DEMO ? 'Design preview — not an official website' : 'Official website of the Nigerian Army'}</span>
           </p>
           <div className="flex shrink-0 items-center gap-4">
             <a href="tel:193" className="hidden items-center gap-1 hover:text-white sm:flex">

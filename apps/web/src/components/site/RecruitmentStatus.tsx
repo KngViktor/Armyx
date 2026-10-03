@@ -6,14 +6,14 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { CalendarClock, ArrowRight } from 'lucide-react';
+import { api } from '@/lib/api';
 
 interface Ex { open: boolean; title?: string; closesAt?: string; opensAt?: string }
 
 export function RecruitmentStatus({ variant = 'card' }: { variant?: 'card' | 'inline' }) {
   const [ex, setEx] = useState<Ex | null>(null);
   useEffect(() => {
-    fetch((process.env.NEXT_PUBLIC_API_BASE ?? '/api/v1') + '/reference/exercise')
-      .then((r) => (r.ok ? r.json() : { open: false }))
+    api<Ex>('/reference/exercise', { maxRetries: 1 })
       .then(setEx)
       .catch(() => setEx({ open: false }));
   }, []);

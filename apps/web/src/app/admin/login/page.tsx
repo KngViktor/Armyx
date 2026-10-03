@@ -6,6 +6,8 @@ import { api } from '@/lib/api';
 import { TextField } from '@/components/ui/Field';
 import { Alert } from '@/components/ui/Alert';
 import { Turnstile } from '@/components/ui/Turnstile';
+import { DemoHint } from '@/components/site/DemoBanner';
+import { DEMO_ADMIN, DEMO_TOTP } from '@/lib/demo/constants';
 
 export default function AdminLogin() {
   const router = useRouter();
@@ -50,6 +52,7 @@ export default function AdminLogin() {
           <div><h1 className="font-serif text-xl font-bold text-white">Recruitment administration</h1><p className="text-xs text-khaki-100">Authorised personnel only. All activity is logged.</p></div>
         </div>
         <form onSubmit={submit} className="space-y-5 p-6">
+          <DemoHint>email <code>{DEMO_ADMIN.email}</code>, password <code>{DEMO_ADMIN.password}</code>, authentication code <code>{DEMO_TOTP}</code>.</DemoHint>
           {error && <Alert tone="error">{error}</Alert>}
           {stage === 'password' && (
             <>

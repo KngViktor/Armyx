@@ -5,6 +5,7 @@ import { CheckCircle2, Mail, Smartphone } from 'lucide-react';
 import { api } from '@/lib/api';
 import { AuthCard } from '@/components/portal/usePortal';
 import { Alert } from '@/components/ui/Alert';
+import { DemoHint } from '@/components/site/DemoBanner';
 
 type Channel = 'email' | 'phone';
 
@@ -75,6 +76,7 @@ function VerifyInner() {
   if (!userId) return <Alert tone="error">Missing account reference. Please register or sign in again.</Alert>;
   return (
     <div className="space-y-4">
+      <DemoHint>no email or SMS is sent. Use the code <code>123456</code> for both.</DemoHint>
       {channels.map((c) => <OtpBox key={c} userId={userId} channel={c} onDone={() => setLeft((n) => n - 1)} />)}
       {left === 0 && <Alert tone="success" title="All verified">Redirecting you to sign in…</Alert>}
       <p className="text-xs text-muted">Codes expire after 10 minutes. Check your spam folder if the email does not arrive.</p>

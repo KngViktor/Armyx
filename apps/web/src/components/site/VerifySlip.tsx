@@ -2,19 +2,23 @@
 import { useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { ShieldAlert, ShieldCheck } from 'lucide-react';
+import { api } from '@/lib/api';
 
 export function VerifySlip() {
   const sp = useSearchParams();
   const id = sp.get('id');
   const s = sp.get('s');
   const [r, setR] = useState<null | { valid: boolean; applicationNo?: string; name?: string; exercise?: string; status?: string }>(null);
+  // The page is prerendered without a query string; render the same neutral markup until hydrated.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   useEffect(() => {
     if (!id || !s) return;
-    fetch(`${process.env.NEXT_PUBLIC_API_BASE ?? '/api/v1'}/verify?id=${encodeURIComponent(id)}&s=${encodeURIComponent(s)}`)
-      .then((res) => res.json())
+    api(`/verify?id=${encodeURIComponent(id)}&s=${encodeURIComponent(s)}`, { maxRetries: 1 })
       .then(setR)
       .catch(() => setR({ valid: false }));
   }, [id, s]);
+  if (!mounted) return <p className="card p-6" aria-live="polite">Loading…</p>;
   if (!id || !s) return <p className="card p-6 text-muted">Scan the QR code printed on the slip with your phone camera to open this page with the slip details.</p>;
   if (!r) return <p className="card p-6" aria-live="polite">Verifying…</p>;
   return r.valid ? (

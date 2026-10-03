@@ -9,6 +9,7 @@ import { Checkbox, TextField } from '@/components/ui/Field';
 import { Turnstile } from '@/components/ui/Turnstile';
 import { Alert } from '@/components/ui/Alert';
 import { PasswordStrength } from '@/components/portal/PasswordStrength';
+import { DemoHint } from '@/components/site/DemoBanner';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -44,6 +45,7 @@ export default function RegisterPage() {
   return (
     <AuthCard title="Create your account" subtitle="Step 1 of the application. It takes about two minutes.">
       <form onSubmit={submit} noValidate className="space-y-5">
+        <DemoHint>use made-up details (e.g. demo@example.com, 08031234567). Nothing leaves your browser.</DemoHint>
         {error && <Alert tone="error">{error}</Alert>}
         <div className="grid gap-5 sm:grid-cols-2">
           <TextField label="Surname" required autoComplete="family-name" value={v.surname} onChange={set('surname')} error={errors.surname} />

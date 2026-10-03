@@ -9,6 +9,13 @@
  */
 const BASE = process.env.NEXT_PUBLIC_API_BASE ?? '/api/v1';
 
+/**
+ * Demo mode (static previews such as Vercel): requests are answered by an
+ * in-browser simulation instead of the real API. The constant is inlined at
+ * build time, so production builds tree-shake the demo code away.
+ */
+export const DEMO = process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -44,6 +51,15 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export async function api<T = any>(path: string, opts: { method?: string; body?: unknown; maxRetries?: number } = {}): Promise<T> {
   const method = opts.method ?? (opts.body === undefined ? 'GET' : 'POST');
+  if (DEMO) {
+    const { demoRequest, DemoError } = await import('./demo/api');
+    try {
+      return (await demoRequest(method, path, opts.body)) as T;
+    } catch (e) {
+      if (e instanceof DemoError) throw new ApiError(e.status, e.message, e.data);
+      throw e;
+    }
+  }
   const maxRetries = opts.maxRetries ?? 8;
   for (let attempt = 0; ; attempt++) {
     const headers: Record<string, string> = { Accept: 'application/json' };
@@ -83,7 +99,20 @@ export async function api<T = any>(path: string, opts: { method?: string; body?:
 }
 
 /** Uploads a file straight to object storage using a presigned POST from the API. */
-export async function uploadToStorage(presigned: { url: string; fields: Record<string, string> }, file: File, onProgress?: (pct: number) => void) {
+export async function uploadToStorage(presigned: { url: string; key?: string; fields: Record<string, string> }, file: File, onProgress?: (pct: number) => void) {
+  if (DEMO) {
+    const { pendingUploads } = await import('./demo/api');
+    for (const pct of [20, 45, 70, 100]) {
+      await new Promise((r) => setTimeout(r, 120));
+      onProgress?.(pct);
+    }
+    // Keep small passport photos (for the slip preview); other files are only recorded by name.
+    const dataUrl = file.type.startsWith('image/') && file.size <= 400 * 1024
+      ? await new Promise<string>((res) => { const fr = new FileReader(); fr.onload = () => res(String(fr.result)); fr.readAsDataURL(file); })
+      : undefined;
+    pendingUploads.set(presigned.key ?? '', { name: file.name, size: file.size, contentType: file.type, dataUrl });
+    return;
+  }
   const form = new FormData();
   for (const [k, v] of Object.entries(presigned.fields)) form.append(k, v);
   form.append('file', file);

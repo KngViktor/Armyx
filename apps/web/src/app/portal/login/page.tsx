@@ -7,6 +7,8 @@ import { AuthCard } from '@/components/portal/usePortal';
 import { TextField } from '@/components/ui/Field';
 import { Turnstile } from '@/components/ui/Turnstile';
 import { Alert } from '@/components/ui/Alert';
+import { DemoHint } from '@/components/site/DemoBanner';
+import { DEMO_APPLICANT, DEMO_TOTP } from '@/lib/demo/constants';
 
 function LoginInner() {
   const router = useRouter();
@@ -40,6 +42,7 @@ function LoginInner() {
 
   return (
     <form onSubmit={submit} className="space-y-5">
+      <DemoHint>sign in as <code>{DEMO_APPLICANT.email}</code> / <code>{DEMO_APPLICANT.password}</code>, or create your own account. Authenticator code: <code>{DEMO_TOTP}</code>.</DemoHint>
       {sp.get('verified') && <Alert tone="success">Your account is verified. Sign in to start your application.</Alert>}
       {sp.get('reset') && <Alert tone="success">Password changed. Sign in with your new password.</Alert>}
       {error && <Alert tone="error">{error}</Alert>}
