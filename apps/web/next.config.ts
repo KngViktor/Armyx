@@ -37,6 +37,11 @@ const securityHeaders = [
 ];
 
 const config: NextConfig = {
+  // Builds on Vercel are design previews: the portal/admin run against the
+  // in-browser demo backend unless NEXT_PUBLIC_DEMO_MODE is set explicitly.
+  env: {
+    NEXT_PUBLIC_DEMO_MODE: process.env.NEXT_PUBLIC_DEMO_MODE ?? (process.env.VERCEL ? 'true' : 'false'),
+  },
   output: 'standalone',
   poweredByHeader: false,
   reactStrictMode: true,
